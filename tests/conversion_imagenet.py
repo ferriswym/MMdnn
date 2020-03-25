@@ -558,10 +558,10 @@ class TestModels(CorrectnessTest):
             del model_converted
             del sys.modules['CaffeModel']
             del caffe
-            os.remove(converted_file + '.py')
-            os.remove(converted_file + '.npy')
-            os.remove(converted_file + '.prototxt')
-            os.remove(converted_file + '.caffemodel')
+            # os.remove(converted_file + '.py')
+            # os.remove(converted_file + '.npy')
+            # os.remove(converted_file + '.prototxt')
+            # os.remove(converted_file + '.caffemodel')
 
             return converted_predict
 
@@ -947,7 +947,6 @@ class TestModels(CorrectnessTest):
 
             # get original model prediction result
             original_predict = parser(network_name, test_input)
-
 
             IR_file = TestModels.tmpdir + original_framework + '_' + network_name + "_converted"
             for emit in self.test_table[original_framework][network_name]:

@@ -109,6 +109,10 @@ package-lock.json
 # tests temporary files
 tests/cache/
 tests/tmp/
+tmp/
+
+# data
+data/
 
 # Visual Studio
 .vs/

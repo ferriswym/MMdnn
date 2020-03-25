@@ -238,29 +238,36 @@ if __name__=='__main__':
 
         if parent_node.get_attr('_output_shapes'):
             shape = parent_node.get_attr('_output_shapes')[0]
-            shape = shape_to_list(shape)
-            h_i = shape[1]
-            w_i = shape[2]
-            pad_h, pad_w = self._get_symmetric_padding(IR_node)
-            stride_h = IR_node.get_attr('strides')[1]
-            stride_w = IR_node.get_attr('strides')[2]
-
-            if IR_node.type == 'Pool':
-                h_o = (h_i + 2 * pad_h - kernel_h + stride_h - 1) // stride_h + 1
-                w_o = (w_i + 2 * pad_w - kernel_w + stride_w - 1) // stride_w + 1
-            elif IR_node.type == 'Unpool':
-                h_o = (h_i - 2 * pad_h - kernel_h + stride_h) * stride_h
-                w_o = (w_i - 2 * pad_w - kernel_w + stride_w) * stride_w
-            else:
-                h_o = (h_i + 2 * pad_h - kernel_h) // stride_h + 1
-                w_o = (w_i + 2 * pad_w - kernel_w) // stride_w + 1
-            return h_o, w_o
+        elif parent_node.get_attr('_output_shape'):
+            shape = parent_node.get_attr('_output_shape')[0]
         else:
             assert False
+        shape = shape_to_list(shape)
+        h_i = shape[1]
+        w_i = shape[2]
+        pad_h, pad_w = self._get_symmetric_padding(IR_node)
+        stride_h = IR_node.get_attr('strides')[1]
+        stride_w = IR_node.get_attr('strides')[2]
+
+        if IR_node.type == 'Pool':
+            h_o = (h_i + 2 * pad_h - kernel_h + stride_h - 1) // stride_h + 1
+            w_o = (w_i + 2 * pad_w - kernel_w + stride_w - 1) // stride_w + 1
+        elif IR_node.type == 'Unpool':
+            h_o = (h_i - 2 * pad_h - kernel_h + stride_h) * stride_h
+            w_o = (w_i - 2 * pad_w - kernel_w + stride_w) * stride_w
+        else:
+            h_o = (h_i + 2 * pad_h - kernel_h) // stride_h + 1
+            w_o = (w_i + 2 * pad_w - kernel_w) // stride_w + 1
+        return h_o, w_o
+        # else:
+        #     assert False
 
 
     def check_if_need_crop(self, IR_node):
-        shape = IR_node.get_attr('_output_shapes')[0]
+        if hasattr(IR_node.layer, '_output_shapes'):
+            shape = IR_node.get_attr('_output_shapes')[0]
+        else:
+            shape = IR_node.get_attr('_output_shape')[0]
         shape = shape_to_list(shape)
         ir_ho = shape[1]
         ir_wo = shape[2]
@@ -655,12 +662,15 @@ if __name__=='__main__':
         scales = IR_node.get_attr('scales')
         scale = tuple(scales)[0]
 
-        shape = IR_node.get_attr('_output_shapes')[0]
+        if hasattr(IR_node, '_output_shapes'):
+            shape = IR_node.get_attr('_output_shapes')[0]
+        else:
+            shape = IR_node.get_attr('_output_shape')[0]
         shape = shape_to_list(shape)
 
         self.add_body(1, "n.{:<15} = L.Deconvolution(n.{}, convolution_param=dict(kernel_size={}, stride={}, pad={}, num_output={}, group={}, bias_term={}), param=[dict(lr_mult=0)], ntop=1)".format(
             IR_node.variable_name,
-            IR_node.in_edges[0],
+            IR_node.in_edges[0].replace('-', '_'),
             2 * scale - scale % 2,
             scale,
             int(math.ceil((scale - 1) / 2)),
