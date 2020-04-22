@@ -463,7 +463,10 @@ class TensorflowParser2(Parser):
 
     def _convert_padding(self, source_node, IR_node, kernel_size):
         # TODO: Fused conv and pool with padding is different from defused operators
-        input_node = self.get_parent(source_node.name, [0])
+        if source_node.type == 'Conv2DBackpropInput':
+            input_node = self.get_parent(source_node.name, [2])
+        else:
+            input_node = self.get_parent(source_node.name, [0])
         input_shape = self.tensor_shape_to_list(input_node.get_attr('_output_shapes'))[0]
 
         if source_node.get_attr('padding') == 'VALID':
@@ -472,6 +475,7 @@ class TensorflowParser2(Parser):
 
         elif source_node.get_attr('padding') == 'SAME':
             padding = compute_tf_same_padding(
+                source_node,
                 input_shape,
                 kernel_size,
                 source_node.get_attr('strides'))
@@ -1171,3 +1175,26 @@ class TensorflowParser2(Parser):
 
     def rename_Log(self, source_node):
         IR_node = self._convert_identity_operation(source_node, new_op = 'Log')
+
+    def rename_Conv2DBackpropInput(self, source_node):
+        IR_node = self._convert_identity_operation(source_node, new_op = 'Deconv')
+        kwargs = {}
+        kwargs['strides'] = source_node.get_attr('strides')
+        kwargs['padding'] = source_node.get_attr('padding')
+
+        input_node = self.src_graph.get_parent(source_node.name, [0])
+        kwargs['shape'] = self.tensor_shape_to_list(input_node.get_attr('_output_shapes'))[0]
+
+        # weights
+        input_node_weight = self.src_graph.get_parent(source_node.name, [1])
+        tensor_content = self.check_const(input_node_weight).get_attr('value')
+        W = tensor_util.MakeNdarray(tensor_content)
+
+        kwargs['kernel_shape'] = self.tensor_shape_to_list(input_node_weight.get_attr('_output_shapes'))[0]
+
+        self.set_weight(source_node.name, 'weights', W)
+
+        self._convert_padding(source_node, IR_node, kwargs['kernel_shape'][:-2])
+
+        assign_IRnode_values(IR_node, kwargs)
+        self._get_bias(source_node, IR_node)

@@ -85,7 +85,7 @@ def list_to_shape(shape):
     return ret
 
 
-def compute_tf_same_padding(input_shape, kernel_shape, strides, data_format='NHWC'):
+def compute_tf_same_padding(source_node, input_shape, kernel_shape, strides, data_format='NHWC'):
     """ Convert [SAME] padding in tensorflow, keras to onnx pads,
         i.e. [x1_begin, x2_begin...x1_end, x2_end,...] """
     # print (input_shape)
@@ -111,13 +111,17 @@ def compute_tf_same_padding(input_shape, kernel_shape, strides, data_format='NHW
     up_list = [0]
     down_list = [0]
 
-    for idx in range(0, len(input_shape)):
-        # kernel_shape[idx] = (kernel_shape[idx] - 1) * dilation_rate + 1
-        output_shape = (input_shape[idx] + strides[idx] - 1) // strides[idx]
-        this_padding = (output_shape - 1) * strides[idx] + kernel_shape[idx] - input_shape[idx]
-        this_padding = max(0, this_padding)
-        up_list.append(this_padding // 2)
-        down_list.append(this_padding - this_padding // 2)
+    if source_node.type == 'Conv2DBackpropInput':
+        up_list += [0, 0]
+        down_list += [0, 0]
+    else:
+        for idx in range(0, len(input_shape)):
+            # kernel_shape[idx] = (kernel_shape[idx] - 1) * dilation_rate + 1
+            output_shape = (input_shape[idx] + strides[idx] - 1) // strides[idx]
+            this_padding = (output_shape - 1) * strides[idx] + kernel_shape[idx] - input_shape[idx]
+            this_padding = max(0, this_padding)
+            up_list.append(this_padding // 2)
+            down_list.append(this_padding - this_padding // 2)
 
     # print ([0] + up_list + [0] + down_list if data_format.startswith('NC') else up_list + [0] + down_list + [0])
     # print ('-----------------------------------------------------')

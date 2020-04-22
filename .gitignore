@@ -110,6 +110,7 @@ package-lock.json
 tests/cache/
 tests/tmp/
 tmp/
+converted_results/
 
 # data
 data/

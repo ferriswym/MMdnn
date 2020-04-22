@@ -176,8 +176,8 @@ if __name__=='__main__':
             pad_h = 0
             pad_w = 0
         else:
-            pad_h = pads[1] + (0 if pads[1] == pads[5] else stride_h)
-            pad_w = pads[2] + (0 if pads[2] == pads[6] else stride_w)
+            pad_h = pads[5] #+ (0 if pads[1] == pads[5] else stride_h)
+            pad_w = pads[6] #+ (0 if pads[2] == pads[6] else stride_w)
 
         return pad_h, pad_w
 
@@ -255,6 +255,9 @@ if __name__=='__main__':
         elif IR_node.type == 'Unpool':
             h_o = (h_i - 2 * pad_h - kernel_h + stride_h) * stride_h
             w_o = (w_i - 2 * pad_w - kernel_w + stride_w) * stride_w
+        elif IR_node.type == 'Deconv':
+            h_o = (h_i - 1) * stride_h + kernel_h - 2 * pad_h
+            w_o = (w_i - 1) * stride_w + kernel_w - 2 * pad_w
         else:
             h_o = (h_i + 2 * pad_h - kernel_h) // stride_h + 1
             w_o = (w_i + 2 * pad_w - kernel_w) // stride_w + 1
@@ -264,10 +267,12 @@ if __name__=='__main__':
 
 
     def check_if_need_crop(self, IR_node):
-        if hasattr(IR_node.layer, '_output_shapes'):
+        if IR_node.get_attr('_output_shapes'):
             shape = IR_node.get_attr('_output_shapes')[0]
-        else:
+        elif IR_node.get_attr('_output_shape'):
             shape = IR_node.get_attr('_output_shape')[0]
+        else:
+            assert False
         shape = shape_to_list(shape)
         ir_ho = shape[1]
         ir_wo = shape[2]
@@ -689,6 +694,31 @@ if __name__=='__main__':
             shape[-1],
             False))
 
+    def emit_Deconv(self, IR_node):
+        pad_h, pad_w = self._get_symmetric_padding(IR_node)
+
+        num_output = IR_node.get_attr('kernel_shape')[2]
+        num_group = IR_node.get_attr("group", 1)
+
+        self.add_body(1, "n.{:<15} = L.Deconvolution(n.{}, convolution_param=dict(kernel_size={}, stride={}, pad_h={}, pad_w={}, \
+            num_output={}, group={}, bias_term={}), ntop=1)".format(
+            IR_node.variable_name,
+            self.parent_variable_name(IR_node),
+            IR_node.get_attr('kernel_shape')[0],
+            IR_node.get_attr('strides')[1],
+            pad_h,
+            pad_w,
+            num_output,
+            num_group,
+            IR_node.get_attr('use_bias', False)))
+
+        dim = len(IR_node.get_attr('strides')) - 2
+        if self.weight_loaded:
+            self.weights_dict[IR_node.name]['weights'] = np.transpose(self.weights_dict[IR_node.name]['weights'], [dim + 1, dim] + list(range(0, dim)))
+            self.weights_dict[IR_node.variable_name] = self.weights_dict.pop(IR_node.name)
+
+        self.check_if_need_crop(IR_node)
+
     # def emit_Square(self, IR_node):
     #     input_layers = ', '.join(('n.' + self.IR_graph.get_node(edge).real_variable_name) for edge in IR_node.in_edges)
     #     self.add_body(1, "n.{:<15} = L.Square({}, ntop=1)".format(
@@ -696,12 +726,12 @@ if __name__=='__main__':
     #         input_layers))
 
 
-    def emit_Elu(self, IR_node):
-        in_place = True
-        self.add_body(1, "n.{:<15} = L.ELU(n.{}, in_place={}, ntop=1)".format(
-            IR_node.variable_name,
-            self.parent_variable_name(IR_node),
-            in_place))
+    # def emit_Elu(self, IR_node):
+    #     in_place = True
+    #     self.add_body(1, "n.{:<15} = L.ELU(n.{}, in_place={}, ntop=1)".format(
+    #         IR_node.variable_name,
+    #         self.parent_variable_name(IR_node),
+    #         in_place))
 
     def emit_SpaceToDepth(self, IR_node):
         self.add_body(1, "")

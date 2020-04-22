@@ -11,6 +11,7 @@ from mmdnn.conversion.examples.imagenet_test import TestKit
 from utils import ensure_dir
 
 tmpdir = './tmp/'
+dstdir = './converted_results/'
 
 def caffe_emit(dstdir, IR_file, architecture_name, test_input_path=None):
 
