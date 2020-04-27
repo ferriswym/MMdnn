@@ -23,6 +23,9 @@ from mmdnn.conversion.examples.imagenet_test import TestKit
 from mmdnn.conversion.examples.extractor import base_extractor
 from mmdnn.conversion.common.utils import download_file
 
+# https://github.com/tensorflow/tensorflow/issues/24496
+config = tf.ConfigProto()
+config.gpu_options.allow_growth = True
 
 class tensorflow_extractor(base_extractor):
 
@@ -292,7 +295,7 @@ class tensorflow_extractor(base_extractor):
 
                 with tf.Graph().as_default() as g:
                     tf.import_graph_def(original_gdef, name='')
-                with tf.Session(graph = g) as sess:
+                with tf.Session(graph = g, config=config) as sess:
                     tf_out = sess.run(tf_output_name[0], feed_dict=feed_dict(input_data)) # temporarily think the num of out nodes is one
                 predict = np.squeeze(tf_out)
                 return predict
@@ -307,7 +310,7 @@ class tensorflow_extractor(base_extractor):
                     labels = tf.squeeze(logits)
 
                 init = tf.global_variables_initializer()
-                with tf.Session() as sess:
+                with tf.Session(config=config) as sess:
                     sess.run(init)
                     saver = tf.train.Saver()
                     saver.restore(sess, path + cls.architecture_map[architecture]['filename'])
